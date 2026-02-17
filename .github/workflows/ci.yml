@@ -2,7 +2,6 @@ name: CI
 
 on:
   push:
-  pull_request:
 
 jobs:
   build:
@@ -17,3 +16,12 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm run build
+      - name: Smoke test production server
+        run: |
+          npm run start -- --port 3010 &
+          SERVER_PID=$!
+          sleep 5
+          curl -f http://127.0.0.1:3010/
+          curl -f http://127.0.0.1:3010/host
+          curl -f http://127.0.0.1:3010/api/health
+          kill $SERVER_PID

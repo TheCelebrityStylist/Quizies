@@ -31,5 +31,8 @@
     "tailwindcss": "^3.4.17",
     "typescript": "^5.7.3",
     "autoprefixer": "file:vendor/autoprefixer"
+  },
+  "engines": {
+    "node": ">=20 <23"
   }
 }
