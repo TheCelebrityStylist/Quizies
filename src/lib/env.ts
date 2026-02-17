@@ -12,33 +12,56 @@ const serverSchema = z.object({
 const clientSchema = z.object({
   NEXT_PUBLIC_PUSHER_KEY: z.string().min(1),
   NEXT_PUBLIC_PUSHER_CLUSTER: z.string().min(1),
-  NEXT_PUBLIC_SITE_URL: z.string().url().default("http://localhost:3000"),
+  NEXT_PUBLIC_SITE_URL: z.string().url(),
 });
 
 type ServerEnv = z.infer<typeof serverSchema>;
+type ClientEnv = z.infer<typeof clientSchema>;
 
-let serverEnv: ServerEnv | null = null;
+type EnvResult<T> = { ok: true; value: T } | { ok: false; error: string };
 
-export const envClient = clientSchema.parse({
-  NEXT_PUBLIC_PUSHER_KEY: process.env.NEXT_PUBLIC_PUSHER_KEY ?? "local-key",
-  NEXT_PUBLIC_PUSHER_CLUSTER: process.env.NEXT_PUBLIC_PUSHER_CLUSTER ?? "eu",
-  NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL,
-});
+let cachedServerEnv: EnvResult<ServerEnv> | null = null;
+let cachedClientEnv: EnvResult<ClientEnv> | null = null;
 
-export function getEnvServer(): ServerEnv {
-  if (serverEnv) return serverEnv;
+export function getServerEnv(): EnvResult<ServerEnv> {
+  if (cachedServerEnv) return cachedServerEnv;
 
   const parsed = serverSchema.safeParse(process.env);
   if (!parsed.success) {
-    throw new Error(`Server env invalid: ${parsed.error.issues.map((i) => i.path.join(".")).join(", ")}`);
+    cachedServerEnv = {
+      ok: false,
+      error: parsed.error.issues.map((issue) => issue.path.join(".")).join(", "),
+    };
+    return cachedServerEnv;
   }
 
-  serverEnv = parsed.data;
-  return serverEnv;
+  cachedServerEnv = { ok: true, value: parsed.data };
+  return cachedServerEnv;
+}
+
+export function getClientEnv(): EnvResult<ClientEnv> {
+  if (cachedClientEnv) return cachedClientEnv;
+
+  const parsed = clientSchema.safeParse({
+    NEXT_PUBLIC_PUSHER_KEY: process.env.NEXT_PUBLIC_PUSHER_KEY,
+    NEXT_PUBLIC_PUSHER_CLUSTER: process.env.NEXT_PUBLIC_PUSHER_CLUSTER,
+    NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000",
+  });
+
+  if (!parsed.success) {
+    cachedClientEnv = {
+      ok: false,
+      error: parsed.error.issues.map((issue) => issue.path.join(".")).join(", "),
+    };
+    return cachedClientEnv;
+  }
+
+  cachedClientEnv = { ok: true, value: parsed.data };
+  return cachedClientEnv;
 }
 
 export function getEnvChecks() {
-  const checks = {
+  return {
     PUSHER_APP_ID: Boolean(process.env.PUSHER_APP_ID),
     PUSHER_KEY: Boolean(process.env.PUSHER_KEY),
     PUSHER_SECRET: Boolean(process.env.PUSHER_SECRET),
@@ -48,10 +71,5 @@ export function getEnvChecks() {
     NEXT_PUBLIC_PUSHER_KEY: Boolean(process.env.NEXT_PUBLIC_PUSHER_KEY),
     NEXT_PUBLIC_PUSHER_CLUSTER: Boolean(process.env.NEXT_PUBLIC_PUSHER_CLUSTER),
     NEXT_PUBLIC_SITE_URL: Boolean(process.env.NEXT_PUBLIC_SITE_URL),
-  };
-
-  return {
-    checks,
-    ok: Object.values(checks).every(Boolean),
   };
 }

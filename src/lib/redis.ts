@@ -1,13 +1,20 @@
 import { Redis } from "@upstash/redis";
-import { getEnvServer } from "./env";
+import { getServerEnv } from "./env";
 
 let redisClient: Redis | null = null;
 
 export function getRedis() {
-  if (!redisClient) {
-    const env = getEnvServer();
-    redisClient = new Redis({ url: env.UPSTASH_REDIS_REST_URL, token: env.UPSTASH_REDIS_REST_TOKEN });
+  if (redisClient) return redisClient;
+
+  const env = getServerEnv();
+  if (!env.ok) {
+    throw new Error(`Redis is not configured: ${env.error}`);
   }
+
+  redisClient = new Redis({
+    url: env.value.UPSTASH_REDIS_REST_URL,
+    token: env.value.UPSTASH_REDIS_REST_TOKEN,
+  });
   return redisClient;
 }
 

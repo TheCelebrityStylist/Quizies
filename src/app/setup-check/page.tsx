@@ -1,7 +1,8 @@
 import { getEnvChecks } from "@/lib/env";
 
 export default function SetupCheckPage() {
-  const { checks, ok } = getEnvChecks();
+  const checks = getEnvChecks();
+  const ok = Object.values(checks).every(Boolean);
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-12">
