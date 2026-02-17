@@ -11,11 +11,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ code: 
   const forbidden = await requireHostSession(s);
   if (forbidden) return forbidden;
 
-  if (s.status === "lobby") {
-    s.status = "live";
-    s.phase = "question";
-    s.questionIndex = 0;
-  }
+  if (s.status === "live") s.phase = "reveal";
 
   await saveSession(code, s);
   const pub = publicState(s);

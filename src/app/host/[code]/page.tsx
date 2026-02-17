@@ -9,11 +9,13 @@ import { QRJoin } from "@/components/QRJoin";
 type PubState = {
   code: string;
   status: "lobby" | "live" | "finished";
+  phase: "question" | "reveal" | "sponsor";
+  tieBreakerActive: boolean;
+  teamMode: boolean;
   title: string;
-  subtitle: string;
   questionIndex: number;
   questionCount: number;
-  currentQuestion: null | { id: string; prompt: string; options: string[] };
+  currentQuestion: null | { id: string; prompt: string; options: string[]; correctIndex: number | null };
   scores: Record<string, number>;
 };
 
@@ -22,129 +24,59 @@ export default function HostPanel() {
   const [state, setState] = useState<PubState | null>(null);
 
   const joinUrl = useMemo(() => `${envClient.NEXT_PUBLIC_SITE_URL}/play/${code}`, [code]);
-  const screenUrl = useMemo(() => `${envClient.NEXT_PUBLIC_SITE_URL}/screen/${code}`, [code]);
-
-  async function refresh() {
-    const res = await fetch(`/api/session/${code}/state`, { cache: "no-store" });
-    if (res.ok) setState(await res.json());
-  }
 
   useEffect(() => {
-    refresh();
-    const p = new Pusher(envClient.NEXT_PUBLIC_PUSHER_KEY, {
-      cluster: envClient.NEXT_PUBLIC_PUSHER_CLUSTER,
+    void fetch(`/api/session/${code}/state`, { cache: "no-store" }).then(async (res) => {
+      if (res.ok) setState(await res.json());
     });
+    const p = new Pusher(envClient.NEXT_PUBLIC_PUSHER_KEY, { cluster: envClient.NEXT_PUBLIC_PUSHER_CLUSTER });
     const ch = p.subscribe(`session-${code}`);
     ch.bind("session:update", (data: PubState) => setState(data));
-    ch.bind("scores:update", (data: { scores: Record<string, number> }) =>
-      setState((s) => (s ? { ...s, scores: data.scores } : s))
-    );
+    ch.bind("scores:update", (data: { scores: Record<string, number> }) => setState((s) => (s ? { ...s, scores: data.scores } : s)));
     return () => {
       p.unsubscribe(`session-${code}`);
       p.disconnect();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [code]);
 
-  async function start() {
-    await fetch(`/api/session/${code}/start`, { method: "POST" });
-  }
-  async function next() {
-    await fetch(`/api/session/${code}/next`, { method: "POST" });
+  async function action(path: string, payload?: unknown) {
+    await fetch(`/api/session/${code}/${path}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: payload ? JSON.stringify(payload) : undefined,
+    });
   }
 
-  const top = useMemo(() => {
-    const entries = Object.entries(state?.scores ?? {});
-    entries.sort((a, b) => b[1] - a[1]);
-    return entries.slice(0, 10);
-  }, [state?.scores]);
+  const top = useMemo(() => Object.entries(state?.scores ?? {}).sort((a, b) => b[1] - a[1]).slice(0, 10), [state?.scores]);
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-10">
-      <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold">Host dashboard</h1>
-          <p className="mt-2 text-white/70">
-            Session <span className="font-semibold text-white">{code}</span>
-          </p>
-          <p className="mt-2 text-sm text-white/60">
-            Big screen:{" "}
-            <a className="underline" href={screenUrl} target="_blank" rel="noreferrer">
-              open
-            </a>
-          </p>
+      <h1 className="text-2xl font-semibold">Host dashboard · {code}</h1>
+      <div className="mt-4 flex flex-wrap gap-2">
+        <button onClick={() => action("start")} className="rounded-lg bg-white px-4 py-2 text-black">Start</button>
+        <button onClick={() => action("reveal")} className="rounded-lg bg-white/10 px-4 py-2 ring-1 ring-white/20">Reveal answer</button>
+        <button onClick={() => action("next")} className="rounded-lg bg-white/10 px-4 py-2 ring-1 ring-white/20">Next question</button>
+        <button onClick={() => action("tiebreaker")} className="rounded-lg bg-white/10 px-4 py-2 ring-1 ring-white/20">Start tie-breaker</button>
+        <button onClick={() => action("team-mode", { enabled: !state?.teamMode })} className="rounded-lg bg-white/10 px-4 py-2 ring-1 ring-white/20">
+          Team mode: {state?.teamMode ? "On" : "Off"}
+        </button>
+      </div>
 
-          <div className="mt-6 flex gap-3">
-            <button
-              onClick={start}
-              className="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-black hover:bg-white/90"
-            >
-              Start
-            </button>
-            <button
-              onClick={next}
-              className="rounded-xl bg-white/10 px-4 py-2 text-sm font-semibold text-white ring-1 ring-white/20 hover:bg-white/15"
-            >
-              Next
-            </button>
-            <button
-              onClick={refresh}
-              className="rounded-xl bg-white/10 px-4 py-2 text-sm font-semibold text-white ring-1 ring-white/20 hover:bg-white/15"
-            >
-              Refresh
-            </button>
-          </div>
-
-          <div className="mt-8 rounded-2xl bg-white/5 p-6 ring-1 ring-white/10">
-            <div className="text-sm font-semibold text-white">Current</div>
-            <div className="mt-2 text-white/80">
-              {state?.status === "lobby" && "Lobby — waiting to start"}
-              {state?.status === "finished" && "Finished"}
-              {state?.status === "live" && state.currentQuestion?.prompt}
-            </div>
-
-            {state?.status === "live" && state.currentQuestion ? (
-              <div className="mt-4 grid gap-2 sm:grid-cols-2">
-                {state.currentQuestion.options.map((o, i) => (
-                  <div
-                    key={i}
-                    className="rounded-xl bg-black/40 p-3 text-sm text-white/80 ring-1 ring-white/10"
-                  >
-                    {o}
-                  </div>
-                ))}
-              </div>
-            ) : null}
-
-            <div className="mt-4 text-xs text-white/60">
-              Progress: {Math.max(0, (state?.questionIndex ?? -1) + 1)}/{state?.questionCount ?? 0}
-            </div>
+      <div className="mt-6 grid gap-5 lg:grid-cols-3">
+        <div className="lg:col-span-2 rounded-2xl bg-white/5 p-6 ring-1 ring-white/10">
+          <p className="text-sm text-white/60">{state?.status} · {state?.phase}</p>
+          <h2 className="mt-2 text-xl font-semibold">{state?.currentQuestion?.prompt ?? "Waiting"}</h2>
+          <div className="mt-4 grid gap-2 sm:grid-cols-2">
+            {state?.currentQuestion?.options.map((o, i) => (
+              <div key={o} className={`rounded-lg p-3 ring-1 ${state.currentQuestion?.correctIndex === i ? "bg-emerald-500/20 ring-emerald-300/50" : "bg-black/40 ring-white/10"}`}>{o}</div>
+            ))}
           </div>
         </div>
-
-        <div className="flex flex-col items-start gap-4">
+        <div className="space-y-4">
           <QRJoin url={joinUrl} />
           <div className="rounded-2xl bg-white/5 p-5 ring-1 ring-white/10">
-            <div className="text-sm font-semibold text-white">Join URL</div>
-            <div className="mt-2 break-all text-xs text-white/70">{joinUrl}</div>
-          </div>
-
-          <div className="w-full rounded-2xl bg-white/5 p-5 ring-1 ring-white/10">
-            <div className="text-sm font-semibold text-white">Top players</div>
-            <div className="mt-3 space-y-2">
-              {top.length === 0 ? (
-                <div className="text-sm text-white/60">No players yet.</div>
-              ) : (
-                top.map(([name, score], idx) => (
-                  <div key={name} className="flex items-center justify-between text-sm">
-                    <div className="text-white/80">
-                      {idx + 1}. {name}
-                    </div>
-                    <div className="font-semibold text-white">{score}</div>
-                  </div>
-                ))
-              )}
-            </div>
+            <div className="text-sm font-semibold">Top scores</div>
+            <div className="mt-3 space-y-2 text-sm">{top.map(([name, score]) => <div key={name} className="flex justify-between"><span>{name}</span><span>{score}</span></div>)}</div>
           </div>
         </div>
       </div>

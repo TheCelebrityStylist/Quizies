@@ -5,16 +5,15 @@ import { envClient } from "@/lib/env";
 export const metadata: Metadata = {
   metadataBase: new URL(envClient.NEXT_PUBLIC_SITE_URL),
   title: {
-    default: "QuizOS — Live pubquiz software (Kahoot-alternatief)",
+    default: "QuizOS — Pubquiz software en Kahoot alternatief",
     template: "%s | QuizOS",
   },
-  description:
-    "Run high-energy quiz nights without Kahoot. QR join, live leaderboard, host control, weekly fresh quizzes. Built for bars, teams and events.",
+  description: "Live pubquiz software met host dashboard, team mode, sponsor slides en wekelijkse quizdrops.",
+  keywords: ["pubquiz software", "kahoot alternatief", "quiz maken", "team quiz"],
   alternates: { canonical: "/" },
   openGraph: {
-    title: "QuizOS — Live pubquiz software (Kahoot-alternatief)",
-    description:
-      "QR join. Live scoring. Host control. Weekly fresh quizzes. Make quiz nights effortless — and repeatable revenue.",
+    title: "QuizOS — Live pubquiz software",
+    description: "QR join, reveal flow, live scoreboard en sponsor momenten.",
     url: "/",
     siteName: "QuizOS",
     images: [{ url: "/opengraph-image", width: 1200, height: 630 }],
@@ -24,7 +23,7 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title: "QuizOS — Live pubquiz software",
-    description: "QR join. Live scoring. Host control. Weekly fresh quizzes.",
+    description: "Host quiz nights with reveal flow, team mode and sponsor slides.",
     images: ["/opengraph-image"],
   },
 };

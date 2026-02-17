@@ -1,12 +1,18 @@
 import Pusher from "pusher";
 import { getEnvServer } from "./env";
 
-const envServer = getEnvServer();
+let pusherClient: Pusher | null = null;
 
-export const pusher = new Pusher({
-  appId: envServer.PUSHER_APP_ID,
-  key: envServer.PUSHER_KEY,
-  secret: envServer.PUSHER_SECRET,
-  cluster: envServer.PUSHER_CLUSTER,
-  useTLS: true,
-});
+export function getPusher() {
+  if (!pusherClient) {
+    const env = getEnvServer();
+    pusherClient = new Pusher({
+      appId: env.PUSHER_APP_ID,
+      key: env.PUSHER_KEY,
+      secret: env.PUSHER_SECRET,
+      cluster: env.PUSHER_CLUSTER,
+      useTLS: true,
+    });
+  }
+  return pusherClient;
+}
