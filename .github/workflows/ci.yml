@@ -1,0 +1,27 @@
+name: CI
+
+on:
+  push:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run build
+      - name: Smoke test production server
+        run: |
+          npm run start -- --port 3010 &
+          SERVER_PID=$!
+          sleep 5
+          curl -f http://127.0.0.1:3010/
+          curl -f http://127.0.0.1:3010/host
+          curl -f http://127.0.0.1:3010/api/health
+          kill $SERVER_PID
